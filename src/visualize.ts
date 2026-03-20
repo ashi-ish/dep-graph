@@ -117,6 +117,24 @@ const html = `<!DOCTYPE html>
 
   const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, options);
 
+  // Keep physics running after initial stabilization so nodes remain reactive
+  network.on("stabilizationIterationsDone", function () {
+    network.setOptions({
+      physics: {
+        enabled: true,
+        stabilization: false,
+        forceAtlas2Based: { gravitationalConstant: -30, springLength: 100, springConstant: 0.02 },
+      },
+    });
+  });
+
+  // Resume simulation when returning to the tab (browsers pause requestAnimationFrame when tab is hidden)
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+      network.startSimulation();
+    }
+  });
+
   // ── Click handler: show info panel ──
   network.on("click", (params) => {
     if (params.nodes.length === 0) return;
