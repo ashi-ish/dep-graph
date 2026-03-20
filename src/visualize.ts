@@ -1,64 +1,15 @@
 import { readFile, writeFile } from "fs/promises";
-
-type DependencyEntry = {
-  tool: string;
-  dependsOn: string[];
-  reasons: string[];
-};
+import type { DependencyEntry } from "./lib/visualize.ts";
+import { collectNodeSet, buildNodes, buildEdges, calcStats } from "./lib/visualize.ts";
 
 const graph: DependencyEntry[] = JSON.parse(
   await readFile("dependency_graph.json", "utf-8")
 );
 
-// ─── Collect all unique tool slugs (nodes) ─────────────────────────────────
-
-const nodeSet = new Set<string>();
-for (const entry of graph) {
-  nodeSet.add(entry.tool);
-  for (const dep of entry.dependsOn) {
-    nodeSet.add(dep);
-  }
-}
-
-// ─── Build nodes ───────────────────────────────────────────────────────────
-
-const nodes = [...nodeSet].map((slug) => ({
-  id: slug,
-  label: slug.startsWith("GOOGLESUPER_")
-    ? slug.replace("GOOGLESUPER_", "GS_")
-    : slug.replace("GITHUB_", "GH_"),
-  title: slug, // shown on hover
-  color: {
-    background: slug.startsWith("GOOGLESUPER_") ? "#4285F4" : "#238636",
-    border: slug.startsWith("GOOGLESUPER_") ? "#1a73e8" : "#196127",
-    highlight: {
-      background: slug.startsWith("GOOGLESUPER_") ? "#74a9f5" : "#56d364",
-      border: "#ffffff",
-    },
-  },
-  font: { color: "#ffffff", size: 11 },
-}));
-
-// ─── Build edges ───────────────────────────────────────────────────────────
-
-const edges: { from: string; to: string; title: string; arrows: string }[] = [];
-for (const entry of graph) {
-  for (let i = 0; i < entry.dependsOn.length; i++) {
-    edges.push({
-      from: entry.tool,           // Tool A
-      to: entry.dependsOn[i]!,   // depends on Tool B  (arrow: A → B)
-      title: entry.reasons[i] ?? "",
-      arrows: "to",
-    });
-  }
-}
-
-const stats = {
-  totalNodes: nodeSet.size,
-  totalEdges: edges.length,
-  googleNodes: [...nodeSet].filter((s) => s.startsWith("GOOGLESUPER_")).length,
-  githubNodes: [...nodeSet].filter((s) => s.startsWith("GITHUB_")).length,
-};
+const nodeSet = collectNodeSet(graph);
+const nodes = buildNodes(nodeSet);
+const edges = buildEdges(graph);
+const stats = calcStats(nodeSet, edges);
 
 // Read vis.js from local node_modules — reliable, no network needed
 const visJsSource = await readFile(
